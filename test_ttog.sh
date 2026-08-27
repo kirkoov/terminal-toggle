@@ -124,6 +124,35 @@ EOF
 	fi
 }
 
+test_missing_light_configuration() {
+	local test_name="missing light configuration is reported"
+	local config_backup="$CONFIG_FILE.test-backup"
+
+	mv "$CONFIG_FILE" "$config_backup"
+
+	cat >"$CONFIG_FILE" <<'EOF'
+PROFILE='0037f5a2-e87b-44ee-b64b-0a93c9450ac8'
+DARK_BG='rgb(46,52,54)'
+DARK_FG='rgb(211,215,207)'
+EOF
+
+	pref_light
+
+	output=$("$TTog" 2>&1)
+	status=$?
+
+	mv "$config_backup" "$CONFIG_FILE"
+
+	if [[ "$status" -eq 0 &&
+		"$output" == $'ttog: light appearance is not configured.\nttog: run \'ttog setup light\' first.' ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output"
+	fi
+}
+
 test_missing_configuration() {
 	local test_name="missing configuration is reported"
 	local config_backup="$CONFIG_FILE.test-backup"
@@ -145,12 +174,47 @@ test_missing_configuration() {
 	fi
 }
 
+test_setup_light() {
+	local test_name="setup light saves current colours"
+	local config_backup="$CONFIG_FILE.test-backup"
+	local expected_bg="'rgb(238,238,236)'"
+	local expected_fg="'rgb(46,52,54)'"
+
+	cp "$CONFIG_FILE" "$config_backup"
+
+	gsettings set "$PROFILE_PATH" use-theme-colors false
+	gsettings set "$PROFILE_PATH" background-color "$expected_bg"
+	gsettings set "$PROFILE_PATH" foreground-color "$expected_fg"
+
+	output=$(printf 'Y\n' | "$TTog" setup light 2>&1)
+	status=$?
+
+	light_bg=$(grep '^LIGHT_BG=' "$CONFIG_FILE" | cut -d= -f2-)
+	light_fg=$(grep '^LIGHT_FG=' "$CONFIG_FILE" | cut -d= -f2-)
+
+	mv "$config_backup" "$CONFIG_FILE"
+
+	if [[ "$status" -eq 0 &&
+		"$light_bg" == "$expected_bg" &&
+		"$light_fg" == "$expected_fg" ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output" \
+			"saved background: $light_bg" \
+			"saved foreground: $light_fg"
+	fi
+}
+
 main() {
 	test_invalid_arguments
 	test_prefer_dark
 	test_prefer_light
 	test_missing_dark_configuration
+	test_missing_light_configuration
 	test_missing_configuration
+	test_setup_light
 }
 
 main
