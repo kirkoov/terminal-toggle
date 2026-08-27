@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+
+CONFIG_DIR="$HOME/.config/terminal-toggle"
+CONFIG_FILE="$CONFIG_DIR/config"
+
+get_config_value() {
+	grep "^$1=" "$CONFIG_FILE" | tail -1 | cut -d= -f2-
+}
+
+if [[ "$1" == "setup" && "$2" =~ ^(light|dark)$ ]]; then
+	:
+elif [[ $# -eq 0 ]]; then
+	:
+else
+	echo "Usage: ttog [setup light|dark]"
+	exit 1
+fi
+
+if [[ "$1" == "setup" ]]; then
+
+	PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
+	PROFILE_PATH="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE/"
+
+	BG=$(gsettings get "$PROFILE_PATH" background-color)
+	FG=$(gsettings get "$PROFILE_PATH" foreground-color)
+
+	printf 'Current default profile: %s\n' "$PROFILE"
+	printf 'Current background: %s\n' "$BG"
+	printf 'Current foreground: %s\n' "$FG"
+	printf '\nSave these colours as the %s appearance? [Y/n] ' "${2^^}"
+
+	read -r answer
+
+	if [[ "$answer" =~ ^[Nn]$ ]]; then
+		echo "Nothing saved."
+		exit 0
+	fi
+
+	mkdir -p "$CONFIG_DIR"
+
+	if [[ "$2" == "light" ]]; then
+
+		if [[ -f "$CONFIG_FILE" ]]; then
+			DARK_BG=$(grep '^DARK_BG=' "$CONFIG_FILE" | cut -d= -f2-)
+			DARK_FG=$(grep '^DARK_FG=' "$CONFIG_FILE" | cut -d= -f2-)
+
+			if [[ -n "$DARK_BG" && -n "$DARK_FG" &&
+				"$BG" == "$DARK_BG" && "$FG" == "$DARK_FG" ]]; then
+				echo "ERROR: light appearance is identical to the saved dark appearance."
+				exit 1
+			fi
+		fi
+
+		{
+			if [[ -f "$CONFIG_FILE" ]]; then
+				grep -v '^LIGHT_BG=\|^LIGHT_FG=' "$CONFIG_FILE"
+			else
+				printf "PROFILE='%s'\n" "$PROFILE"
+			fi
+
+			printf 'LIGHT_BG=%s\n' "$BG"
+			printf 'LIGHT_FG=%s\n' "$FG"
+		} >"$CONFIG_FILE.tmp"
+
+		mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+
+		SAVED_BG=$(grep '^LIGHT_BG=' "$CONFIG_FILE" | cut -d= -f2-)
+		SAVED_FG=$(grep '^LIGHT_FG=' "$CONFIG_FILE" | cut -d= -f2-)
+
+	else
+		LIGHT_BG=$(grep '^LIGHT_BG=' "$CONFIG_FILE" | cut -d= -f2-)
+		LIGHT_FG=$(grep '^LIGHT_FG=' "$CONFIG_FILE" | cut -d= -f2-)
+
+		if [[ "$BG" == "$LIGHT_BG" && "$FG" == "$LIGHT_FG" ]]; then
+			echo "ERROR: dark appearance is identical to the saved light appearance."
+			exit 1
+		fi
+
+		{
+			grep -v '^DARK_BG=\|^DARK_FG=' "$CONFIG_FILE"
+			printf 'DARK_BG=%s\n' "$BG"
+			printf 'DARK_FG=%s\n' "$FG"
+		} >"$CONFIG_FILE.tmp"
+
+		mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+
+		SAVED_BG=$(grep '^DARK_BG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+		SAVED_FG=$(grep '^DARK_FG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+	fi
+
+	if [[ "$SAVED_BG" == "$BG" && "$SAVED_FG" == "$FG" ]]; then
+		printf '%s appearance saved and verified.\n' "${2^}"
+	else
+		printf 'ERROR: saved %s appearance does not match.\n' "$2"
+		exit 1
+	fi
+
+fi
+
+if [[ $# -eq 0 ]]; then
+
+	if [[ ! -f "$CONFIG_FILE" ]]; then
+		echo "ttog: no configuration found."
+		echo "ttog: choose your favourite light/dark pair, running first 'ttog setup light' & then 'ttog setup dark' in the Terminal."
+		exit 0
+	fi
+
+	PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
+	PROFILE_PATH="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE/"
+
+	SYSTEM_APPEARANCE=$(gsettings get org.gnome.desktop.interface color-scheme)
+
+	LIGHT_BG=$(get_config_value LIGHT_BG)
+	LIGHT_FG=$(get_config_value LIGHT_FG)
+
+	case "$SYSTEM_APPEARANCE" in
+	"'prefer-light'")
+		if [[ -z "$LIGHT_BG" || -z "$LIGHT_FG" ]]; then
+			echo "ttog: light appearance is not configured."
+			echo "ttog: run 'ttog setup light' first."
+			exit 0
+		fi
+		gsettings set "$PROFILE_PATH" use-theme-colors false
+		gsettings set "$PROFILE_PATH" background-color "$LIGHT_BG"
+		gsettings set "$PROFILE_PATH" foreground-color "$LIGHT_FG"
+		;;
+
+	"'prefer-dark'")
+		DARK_BG=$(get_config_value DARK_BG)
+		DARK_FG=$(get_config_value DARK_FG)
+
+		if [[ -z "$DARK_BG" || -z "$DARK_FG" ]]; then
+			echo "ttog: dark appearance is not configured."
+			echo "ttog: run 'ttog setup dark' first."
+			exit 0
+		fi
+
+		gsettings set "$PROFILE_PATH" use-theme-colors false
+		gsettings set "$PROFILE_PATH" background-color "$DARK_BG"
+		gsettings set "$PROFILE_PATH" foreground-color "$DARK_FG"
+		;;
+
+	*)
+		echo "System appearance is not explicitly light or dark."
+		exit 1
+		;;
+	esac
+fi
