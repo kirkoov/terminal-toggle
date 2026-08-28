@@ -207,6 +207,93 @@ test_setup_light() {
 	fi
 }
 
+test_setup_dark() {
+	local test_name="setup dark saves current colours"
+	local config_backup="$CONFIG_FILE.test-backup"
+	local expected_bg="'rgb(46,52,54)'"
+	local expected_fg="'rgb(211,215,207)'"
+
+	cp "$CONFIG_FILE" "$config_backup"
+
+	gsettings set "$PROFILE_PATH" use-theme-colors false
+	gsettings set "$PROFILE_PATH" background-color "$expected_bg"
+	gsettings set "$PROFILE_PATH" foreground-color "$expected_fg"
+
+	output=$(printf 'Y\n' | "$TTog" setup dark 2>&1)
+	status=$?
+
+	dark_bg=$(grep '^DARK_BG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+	dark_fg=$(grep '^DARK_FG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+
+	mv "$config_backup" "$CONFIG_FILE"
+
+	if [[ "$status" -eq 0 &&
+		"$dark_bg" == "$expected_bg" &&
+		"$dark_fg" == "$expected_fg" ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output" \
+			"saved background: $dark_bg" \
+			"saved foreground: $dark_fg"
+	fi
+}
+
+test_setup_light_rejects_dark_colours() {
+	local test_name="setup light rejects colours identical to dark"
+	local config_backup="$CONFIG_FILE.test-backup"
+	local expected_bg="'rgb(46,52,54)'"
+	local expected_fg="'rgb(211,215,207)'"
+
+	cp "$CONFIG_FILE" "$config_backup"
+
+	gsettings set "$PROFILE_PATH" use-theme-colors false
+	gsettings set "$PROFILE_PATH" background-color "$expected_bg"
+	gsettings set "$PROFILE_PATH" foreground-color "$expected_fg"
+
+	output=$(printf 'Y\n' | "$TTog" setup light 2>&1)
+	status=$?
+
+	mv "$config_backup" "$CONFIG_FILE"
+
+	if [[ "$status" -eq 1 &&
+		"$output" == *"ERROR: light appearance is identical to the saved dark appearance."* ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output"
+	fi
+}
+
+test_setup_dark_rejects_light_colours() {
+	local test_name="setup dark rejects colours identical to light"
+	local config_backup="$CONFIG_FILE.test-backup"
+	local expected_bg="'rgb(238,238,236)'"
+	local expected_fg="'rgb(46,52,54)'"
+
+	cp "$CONFIG_FILE" "$config_backup"
+
+	gsettings set "$PROFILE_PATH" use-theme-colors false
+	gsettings set "$PROFILE_PATH" background-color "$expected_bg"
+	gsettings set "$PROFILE_PATH" foreground-color "$expected_fg"
+
+	output=$(printf 'Y\n' | "$TTog" setup dark 2>&1)
+	status=$?
+
+	mv "$config_backup" "$CONFIG_FILE"
+
+	if [[ "$status" -eq 1 &&
+		"$output" == *"ERROR: dark appearance is identical to the saved light appearance."* ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output"
+	fi
+}
+
 main() {
 	test_invalid_arguments
 	test_prefer_dark
@@ -215,6 +302,9 @@ main() {
 	test_missing_light_configuration
 	test_missing_configuration
 	test_setup_light
+	test_setup_dark
+	test_setup_light_rejects_dark_colours
+	test_setup_dark_rejects_light_colours
 }
 
 main
