@@ -294,6 +294,76 @@ test_setup_dark_rejects_light_colours() {
 	fi
 }
 
+test_setup_declined() {
+	local appearance="$1"
+	local test_name="setup $appearance declined leaves configuration unchanged"
+	local config_backup="$CONFIG_FILE.test-backup"
+	local config_before
+	local config_after
+
+	cp "$CONFIG_FILE" "$config_backup"
+	config_before=$(cat "$CONFIG_FILE")
+
+	output=$(printf 'N\n' | "$TTog" setup "$appearance" 2>&1)
+	status=$?
+
+	config_after=$(cat "$CONFIG_FILE")
+
+	mv "$config_backup" "$CONFIG_FILE"
+
+	if [[ "$status" -eq 0 &&
+		"$output" == *"Nothing saved."* &&
+		"$config_after" == "$config_before" ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output" \
+			"configuration changed: $([[ "$config_after" != "$config_before" ]] && echo yes || echo no)"
+	fi
+}
+
+test_unsupported_appearance() {
+	local test_name="unsupported system appearance is rejected"
+
+	gsettings set org.gnome.desktop.interface color-scheme default
+
+	output=$("$TTog" 2>&1)
+	status=$?
+
+	if [[ "$status" -eq 1 &&
+		"$output" == "System appearance is not explicitly light or dark." ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output"
+	fi
+}
+
+test_disables_theme_colours() {
+	local test_name="ttog disables system theme colours before applying setup"
+
+	pref_dark
+	gsettings set "$PROFILE_PATH" use-theme-colors true
+
+	output=$("$TTog" 2>&1)
+	status=$?
+
+	theme_colours=$(gsettings get "$PROFILE_PATH" use-theme-colors)
+
+	if [[ "$status" -eq 0 &&
+		-z "$output" &&
+		"$theme_colours" == "false" ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output" \
+			"use-theme-colors: $theme_colours"
+	fi
+}
+
 main() {
 	test_invalid_arguments
 	test_prefer_dark
@@ -305,6 +375,10 @@ main() {
 	test_setup_dark
 	test_setup_light_rejects_dark_colours
 	test_setup_dark_rejects_light_colours
+	test_setup_declined light
+	test_setup_declined dark
+	test_unsupported_appearance
+	test_disables_theme_colours
 }
 
 main
