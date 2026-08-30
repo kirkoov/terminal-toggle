@@ -9,8 +9,11 @@ TTog="$SCRIPT_DIR/ttog"
 CONFIG_FILE="$HOME/.config/terminal-toggle/config"
 PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
 PROFILE_PATH="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE/"
+CONFIGURED_PROFILE=$(grep '^PROFILE=' "$CONFIG_FILE" | tail -1 | cut -d= -f2- | tr -d "'")
+gsettings set org.gnome.Terminal.ProfilesList default "'$CONFIGURED_PROFILE'"
 
 cleanup() {
+	gsettings set org.gnome.Terminal.ProfilesList default "'$PROFILE'"
 	gsettings set org.gnome.desktop.interface color-scheme "$ORIGINAL_APPEARANCE"
 }
 
@@ -28,7 +31,14 @@ fail() {
 	exit 1
 }
 
+# get_terminal_colours() {
+# 	background=$(gsettings get "$PROFILE_PATH" background-color)
+# 	foreground=$(gsettings get "$PROFILE_PATH" foreground-color)
+# }
+
 get_terminal_colours() {
+	PROFILE=$(grep '^PROFILE=' "$CONFIG_FILE" | tail -1 | cut -d= -f2- | tr -d "'")
+	PROFILE_PATH="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE/"
 	background=$(gsettings get "$PROFILE_PATH" background-color)
 	foreground=$(gsettings get "$PROFILE_PATH" foreground-color)
 }
@@ -364,6 +374,97 @@ test_disables_theme_colours() {
 	fi
 }
 
+test_setup_preserves_other_appearance() {
+	local appearance="$1"
+	local test_name="setup $appearance preserves the other appearance"
+	local config_backup="$CONFIG_FILE.test-backup"
+	local other_bg
+	local other_fg
+	local expected_bg
+	local expected_fg
+
+	cp "$CONFIG_FILE" "$config_backup"
+
+	if [[ "$appearance" == "light" ]]; then
+		other_bg=$(grep '^DARK_BG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+		other_fg=$(grep '^DARK_FG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+		expected_bg="'rgb(255,255,255)'"
+		expected_fg="'rgb(0,0,0)'"
+	else
+		other_bg=$(grep '^LIGHT_BG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+		other_fg=$(grep '^LIGHT_FG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+		expected_bg="'rgb(30,30,30)'"
+		expected_fg="'rgb(240,240,240)'"
+	fi
+
+	gsettings set "$PROFILE_PATH" use-theme-colors false
+	gsettings set "$PROFILE_PATH" background-color "$expected_bg"
+	gsettings set "$PROFILE_PATH" foreground-color "$expected_fg"
+
+	output=$(printf 'Y\n' | "$TTog" setup "$appearance" 2>&1)
+	status=$?
+
+	if [[ "$appearance" == "light" ]]; then
+		saved_bg=$(grep '^DARK_BG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+		saved_fg=$(grep '^DARK_FG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+	else
+		saved_bg=$(grep '^LIGHT_BG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+		saved_fg=$(grep '^LIGHT_FG=' "$CONFIG_FILE" | tail -1 | cut -d= -f2-)
+	fi
+
+	mv "$config_backup" "$CONFIG_FILE"
+
+	if [[ "$status" -eq 0 &&
+		"$saved_bg" == "$other_bg" &&
+		"$saved_fg" == "$other_fg" ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output" \
+			"original background: $other_bg" \
+			"saved background: $saved_bg" \
+			"original foreground: $other_fg" \
+			"saved foreground: $saved_fg"
+	fi
+}
+
+test_different_default_profile_is_untouched() {
+	local test_name="different default profile is left untouched"
+	local old_profile='b1dcc9dd-5262-4d8d-a863-c897e6d979b9'
+	local old_profile_path="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$old_profile/"
+	local expected_bg="'rgb(238,238,236)'"
+	local expected_fg="'rgb(46,52,54)'"
+
+	gsettings set "$old_profile_path" use-theme-colors false
+	gsettings set "$old_profile_path" background-color "$expected_bg"
+	gsettings set "$old_profile_path" foreground-color "$expected_fg"
+
+	gsettings set org.gnome.Terminal.ProfilesList default "'$old_profile'"
+	pref_dark
+
+	output=$("$TTog" 2>&1)
+	status=$?
+
+	background=$(gsettings get "$old_profile_path" background-color)
+	foreground=$(gsettings get "$old_profile_path" foreground-color)
+
+	gsettings set org.gnome.Terminal.ProfilesList default "'$CONFIGURED_PROFILE'"
+
+	if [[ "$status" -eq 0 &&
+		-z "$output" &&
+		"$background" == "$expected_bg" &&
+		"$foreground" == "$expected_fg" ]]; then
+		pass "$test_name"
+	else
+		fail "$test_name" \
+			"exit status: $status" \
+			"output: $output" \
+			"background: $background" \
+			"foreground: $foreground"
+	fi
+}
+
 main() {
 	test_invalid_arguments
 	test_prefer_dark
@@ -379,6 +480,9 @@ main() {
 	test_setup_declined dark
 	test_unsupported_appearance
 	test_disables_theme_colours
+	test_setup_preserves_other_appearance light
+	test_setup_preserves_other_appearance dark
+	test_different_default_profile_is_untouched
 }
 
 main

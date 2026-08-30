@@ -105,7 +105,7 @@ if [[ $# -eq 0 ]]; then
 		exit 0
 	fi
 
-	PROFILE=$(gsettings get org.gnome.Terminal.ProfilesList default | tr -d "'")
+	PROFILE=$(get_config_value PROFILE | tr -d "'")
 	PROFILE_PATH="org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:$PROFILE/"
 
 	SYSTEM_APPEARANCE=$(gsettings get org.gnome.desktop.interface color-scheme)
