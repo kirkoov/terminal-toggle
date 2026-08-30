@@ -20,11 +20,7 @@ apply_colours() {
 	gsettings set "$PROFILE_PATH" foreground-color "$foreground"
 }
 
-if [[ "$1" == "setup" && "$2" =~ ^(light|dark)$ ]]; then
-	:
-elif [[ $# -eq 0 ]]; then
-	:
-else
+if [[ $# -ne 0 && ! ("$1" == "setup" && "$2" =~ ^(light|dark)$) ]]; then
 	echo "Usage: ttog [setup light|dark]"
 	exit 1
 fi
@@ -108,53 +104,51 @@ if [[ "$1" == "setup" ]]; then
 		exit 1
 	fi
 
+	exit 0
 fi
 
-if [[ $# -eq 0 ]]; then
+if [[ ! -f "$CONFIG_FILE" ]]; then
+	echo "ttog: no configuration found."
+	echo "ttog: choose your favourite light/dark pair, running first 'ttog setup light' & then 'ttog setup dark' in the Terminal."
+	exit 0
+fi
 
-	if [[ ! -f "$CONFIG_FILE" ]]; then
-		echo "ttog: no configuration found."
-		echo "ttog: choose your favourite light/dark pair, running first 'ttog setup light' & then 'ttog setup dark' in the Terminal."
+PROFILE=$(get_config_value PROFILE | tr -d "'")
+PROFILE_PATH=$(get_profile_path "$PROFILE")
+
+SYSTEM_APPEARANCE=$(gsettings get org.gnome.desktop.interface color-scheme)
+
+LIGHT_BG=$(get_config_value LIGHT_BG)
+LIGHT_FG=$(get_config_value LIGHT_FG)
+
+case "$SYSTEM_APPEARANCE" in
+"'prefer-light'")
+	if [[ -z "$LIGHT_BG" || -z "$LIGHT_FG" ]]; then
+		echo "ttog: light appearance is not configured."
+		echo "ttog: run 'ttog setup light' first."
 		exit 0
 	fi
 
-	PROFILE=$(get_config_value PROFILE | tr -d "'")
-	PROFILE_PATH=$(get_profile_path "$PROFILE")
+	apply_colours "$LIGHT_BG" "$LIGHT_FG"
 
-	SYSTEM_APPEARANCE=$(gsettings get org.gnome.desktop.interface color-scheme)
+	;;
 
-	LIGHT_BG=$(get_config_value LIGHT_BG)
-	LIGHT_FG=$(get_config_value LIGHT_FG)
+"'prefer-dark'")
+	DARK_BG=$(get_config_value DARK_BG)
+	DARK_FG=$(get_config_value DARK_FG)
 
-	case "$SYSTEM_APPEARANCE" in
-	"'prefer-light'")
-		if [[ -z "$LIGHT_BG" || -z "$LIGHT_FG" ]]; then
-			echo "ttog: light appearance is not configured."
-			echo "ttog: run 'ttog setup light' first."
-			exit 0
-		fi
+	if [[ -z "$DARK_BG" || -z "$DARK_FG" ]]; then
+		echo "ttog: dark appearance is not configured."
+		echo "ttog: run 'ttog setup dark' first."
+		exit 0
+	fi
 
-		apply_colours "$LIGHT_BG" "$LIGHT_FG"
+	apply_colours "$DARK_BG" "$DARK_FG"
 
-		;;
+	;;
 
-	"'prefer-dark'")
-		DARK_BG=$(get_config_value DARK_BG)
-		DARK_FG=$(get_config_value DARK_FG)
-
-		if [[ -z "$DARK_BG" || -z "$DARK_FG" ]]; then
-			echo "ttog: dark appearance is not configured."
-			echo "ttog: run 'ttog setup dark' first."
-			exit 0
-		fi
-
-		apply_colours "$DARK_BG" "$DARK_FG"
-
-		;;
-
-	*)
-		echo "System appearance is not explicitly light or dark."
-		exit 1
-		;;
-	esac
-fi
+*)
+	echo "System appearance is not explicitly light or dark."
+	exit 1
+	;;
+esac
