@@ -2,7 +2,7 @@
 
 `ttog` is installed as a system command and invoked automatically when a new interactive Bash shell starts.
 
-This guide walks through a complete (first-time or a second re-) installation and setup.
+This guide walks through a complete first-time or subsequent installation and setup.
 
 ## 1. Clone the repository
 
@@ -60,27 +60,23 @@ This is important because `ttog setup` reads the colours from the profile that i
 
 Your current default profile may not be the one you want `ttog` to control.
 
-In your current GNOME Terminal, find the Preferences, then:
+In your current GNOME Terminal, open the Preferences, then:
 
 1. Select the (create a) profile you want `ttog` to control.
 2. Make it the default profile.
-3. Make sure **Use colours from system theme** is disabled for this profile.
+3. Ensure the **Use colours from system theme** is disabled for this profile.
 
 `ttog` also disables this setting automatically when it later applies a saved colour pair, but disabling it during setup makes it clear that the profile's colours are being managed explicitly.
 
 ## 5. Choose and save the light appearance
 
-With the desired profile now set as the default, go to the Colours tab and choose the ones you want to use for your controlled profile's light appearance. It's easier to choose among the available schemes, like GNOME, Tango, or Solarized. E.g. choose the 'Tango light' first
-
-Then run:
+With the desired profile now set as the default, go to the **Colours** tab and choose the colours you want to use for your controlled profile's light appearance. It's easier to pick up one from the available schemes, like GNOME, Tango, or Solarized. E.g. the 'Tango light' first, then run:
 
 ```bash
 ttog setup light
 ```
 
-`ttog` displays the current default profile ID and the light colours codes and asks for confirmation. Answer `Y` to save them.
-
-You should see:
+`ttog` displays the current default profile ID and its current colour values and asks for confirmation. Answer `Y` to save them. You should see:
 
 ```text
 Light appearance saved and verified.
@@ -88,23 +84,19 @@ Light appearance saved and verified.
 
 ## 6. Choose and save the dark appearance
 
-Similarly, choose your dark colours now.
-
-Then run:
+Similarly, choose your dark colours now. Then run:
 
 ```bash
 ttog setup dark
 ```
 
-Confirm with `Y`.
-
-You should see:
+Confirm with `Y`. You will see:
 
 ```text
 Dark appearance saved and verified.
 ```
 
-The two colour pairs must be different.
+`The two colour pairs must be different.`
 
 ## 7. Verify the installation
 
@@ -115,7 +107,9 @@ Open a **new Terminal window**.
 - **light system appearance** → saved light colours
 - **dark system appearance** → saved dark colours
 
-`To cross-check`: set the current system appearance to its opposite **light / dark** one and open a new Terminal window. Confirm that it follows suit. If it does, the installation and setup are complete. **_Otherwise let me know about your outstanding case))_**
+`To cross-check`: set the current system appearance to its opposite **light / dark** one and open a new Terminal window. Confirm that it follows suit.
+
+If it does, the installation and setup are complete.
 
 ## Configuration
 
@@ -127,7 +121,7 @@ Open a **new Terminal window**.
 
 The configuration records the managed Terminal profile and its saved light and dark colours.
 
-Changing GNOME Terminal's default profile later does **not** change the profile managed by `ttog`. To have `ttog` manage a different profile, make that profile the default and run the setup commands again.
+Changing GNOME Terminal's default profile later does **not** change the profile managed by `ttog`. To have `ttog` control a different profile, make that profile the default and run the setup commands again.
 
 ## Uninstall
 
@@ -137,11 +131,7 @@ Remove the installed command:
 sudo rm /usr/local/bin/ttog
 ```
 
-Then remove the automatic Bash invocation from `~/.bashrc`:
-
-```text
-ttog <-THIS IS NOT THE REMOVAL COMMAND!!!!!!!!!!!!
-```
+Then remove the automatic Bash invocation from ~/.bashrc. The line added during installation is: `ttog`. Remove that line from ~/.bashrc.
 
 The `ttog` configuration remains in:
 
